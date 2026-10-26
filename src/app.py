@@ -1,9 +1,8 @@
-"""
-AgriPulse COOL - FastAPI Backend Telemetry & Processing Server
-"""
-
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import os
 from src.processor import CropVisionProcessor
 from src.agent_loop import AgenticDecisionLoop
 
@@ -13,29 +12,29 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Mount static folder for frontend dashboard
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 processor = CropVisionProcessor()
 agent = AgenticDecisionLoop()
 
 class InspectionRequest(BaseModel):
     image_path: str = "data/sample_crop_frame.jpg"
 
-@app.get("/")
-def root():
-    return {
-        "project": "AgriPulse COOL",
-        "sponsor": "OpenCV AI Competition 2026 powered by AWS",
-        "status": "Operational"
-    }
+@app.get("/", response_class=HTMLResponse)
+def serve_dashboard():
+    """Serves the interactive AgriPulse COOL frontend dashboard."""
+    html_path = "static/index.html"
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return {"message": "AgriPulse COOL API is running. Visit /docs for Swagger UI."}
 
 @app.post("/api/v1/inspect")
 def run_inspection(payload: InspectionRequest):
     try:
-        # Step 1: Perception (OpenCV 5 + COOL)
         metrics = processor.analyze_frame(payload.image_path)
-        
-        # Step 2: Agentic Reasoning & Decision Loop
         decision = agent.evaluate_and_act(metrics)
-        
         return {
             "vision_analysis": metrics,
             "agent_decision": decision,
